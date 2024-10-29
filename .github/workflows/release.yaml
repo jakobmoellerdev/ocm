@@ -120,6 +120,10 @@ jobs:
 
   release:
     needs:
+    # run check before actual release to make sure we succeed
+    # this is necessary becose if we dont specify it and lint-and-test dont run
+    # they will be skipped from the needs check
+    - check
     - lint-and-test
     - components
     name: Release Build
