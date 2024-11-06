@@ -8,16 +8,6 @@ name: Release Branch Cutoff
 
 on:
   workflow_dispatch:
-    inputs:
-      minor:
-        type: string
-        description: |
-          Minor Release version (e.g. v0.17) to create a release branch from.
-          The branch will be created in the form of 'releases/v0.17'.
-          
-          The branch will contain an initial commit with a VERSION file containing the minor release version.
-          The branch will be pushed to the origin repository.
-        required: true
 
 jobs:
   cutoff-preconditions:
@@ -26,6 +16,8 @@ jobs:
       contents: read
       id-token: write
       repository-projects: read
+    outputs:
+      minor: ${{ steps.get-next-major-minor.outputs.minor }}
     steps:
       - name: Generate token
         id: generate_token
@@ -33,19 +25,29 @@ jobs:
         with:
           app_id: ${{ secrets.OCMBOT_APP_ID }}
           private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: '${{ github.workspace }}/go.mod'
+          cache: false
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
           token: ${{ steps.generate_token.outputs.token }}
+      - name: Get Next Major-Minor
+        id: get-next-major-minor
+        run: |
+          set -e
+          minor="$(go run ./api/version/generate print-major-minor)"
+          echo "minor=$minor" >> $GITHUB_OUTPUT
       - name: Verify Release Notes already exist
         id: verify-release-notes
         env:
-          RELEASE_VERSION: ${{ github.event.inputs.minor }}
+          RELEASE_VERSION: ${{ github.event.inputs.minor }}.0
         run: |
-          version = ${{ env.RELEASE_VERSION }}.0
-          f="docs/releasenotes/$version.md"
+          f="docs/releasenotes/$RELEASE_VERSION.md"
           if [ ! -f "$f" ]; then
             >&2 echo "no release notes file $f found in code base"
             exit 2
@@ -82,7 +84,7 @@ jobs:
           git config --global user.name github-actions
           git config --global user.email '${GITHUB_ACTOR}@users.noreply.github.com'
           
-          minor="${{github.event.inputs.minor}}"
+          minor="${{ needs.cutoff-preconditions.outputs.minor }}"
           
           if ! [[ "$tag" =~ ^v?[0-9]+\.[0-9]+$ ]]; then
             >&2 echo "no valid release branch minor $minor: it has to be of the form '^v?[0-9]+\.[0-9]+$'"

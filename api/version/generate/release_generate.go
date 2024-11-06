@@ -84,6 +84,8 @@ func main() {
 	switch cmd {
 	case "print-semver":
 		fmt.Print(nonpre)
+	case "print-major-minor":
+		fmt.Printf("%d.%d", nonpre.Major(), nonpre.Minor())
 	case "print-version":
 		fmt.Print(v)
 	case "print-rc-version":
@@ -99,10 +101,9 @@ func main() {
 		} else {
 			next = nonpre.IncMinor().String()
 		}
-		next += "-dev"
 		fmt.Printf("%s", next)
 	case "bump-patch":
-		next := nonpre.IncPatch().String() + "-dev"
+		next := nonpre.IncPatch().String()
 		fmt.Printf("%s", next)
 	default:
 		Error(fmt.Errorf("invalid command %q", cmd))
