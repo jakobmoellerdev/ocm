@@ -24,8 +24,8 @@ jobs:
       repository-projects: read
     outputs:
       base-version: ${{ steps.set-base-version.outputs.BASE_VERSION }}
-      release-version: ${{ steps.set-version.outputs.RELEASE_VERSION }}
-      release-version-no-prefix: ${{ steps.set-version.outputs.RELEASE_VERSION_NO_PREFIX }}
+      release-version: ${{ steps.export-version.outputs.RELEASE_VERSION }}
+      release-version-no-prefix: ${{ steps.export-version.outputs.RELEASE_VERSION_NO_PREFIX }}
       release-notes: ${{ steps.release-notes.outputs.body }}
     steps:
       - name: Checkout
@@ -45,17 +45,16 @@ jobs:
         run: |
           RELEASE_VERSION=v$(go run $GITHUB_WORKSPACE/api/version/generate --no-dev print-rc-version ${{ github.event.inputs.release_candidate_name }})
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
       - name: Set Version
-        id: set-version
         if: inputs.release_candidate == false
         run: |
           RELEASE_VERSION=${{env.BASE_VERSION}}
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
 
       - name: Export Version Without Prefix
+        id: export-version
         run: |
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
           echo "RELEASE_VERSION_NO_PREFIX=${RELEASE_VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Check Tag
