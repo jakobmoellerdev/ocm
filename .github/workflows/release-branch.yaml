@@ -18,6 +18,7 @@ jobs:
       repository-projects: read
     outputs:
       minor: ${{ steps.get-minor.outputs.minor }}
+      branch: ${{ steps.verify-branch.outputs.branch }}
     steps:
       - name: Generate token
         id: generate_token
@@ -57,6 +58,18 @@ jobs:
           fi
           echo "release-notes-file=$f" >> $GITHUB_ENV
           echo "release-notes-file=$f" >> $GITHUB_OUTPUT
+      - name: Verify Branch does not exist
+        id: verify-branch
+        run: |
+          set -e
+          minor="v${{ steps.get-minor.outputs.minor }}"
+          branch="releases/$minor"
+          if git ls-remote --exit-code origin refs/heads/$branch ; then
+            >&2 echo "branch $branch already exists, aborting"
+            exit 1
+          fi
+          echo "branch $branch does not exist"
+          echo "branch=$branch" >> $GITHUB_OUTPUT
 
   create-branch:
     runs-on: ubuntu-latest
@@ -82,26 +95,7 @@ jobs:
       - name: Create Release Branch
         run: |
           set -e
-          git config --global user.name github-actions
-          git config --global user.email '${GITHUB_ACTOR}@users.noreply.github.com'
-          
-          minor="v${{ needs.cutoff-preconditions.outputs.minor }}"
-          
-          if ! [[ "$tag" =~ ^v?[0-9]+\.[0-9]+$ ]]; then
-            >&2 echo "no valid release branch minor $minor: it has to be of the form '^v?[0-9]+\.[0-9]+$'"
-            exit 1
-          fi
-          
-          
-          branch="releases/$minor"
-          
-          if git ls-remote --exit-code origin refs/heads/$branch ; then
-            >&2 echo "branch $branch already exists, aborting"
-            exit 1
-          fi
-          
-          echo "creating release branch: $branch"
-          
+          branch=${{ needs.cutoff-preconditions.outputs.branch }}
           git checkout -b "$branch"
           git push origin $branch
   bump-main-pr:
