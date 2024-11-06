@@ -12,6 +12,12 @@ jobs:
       id-token: write
       repository-projects: read
     steps:
+    - name: Generate token
+      id: generate_token
+      uses: tibdex/github-app-token@v2
+      with:
+        app_id: ${{ secrets.OCMBOT_APP_ID }}
+        private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
     - name: Checkout
       uses: actions/checkout@v4
       with:
@@ -66,6 +72,7 @@ jobs:
         releaseName: ${{ env.RELEASE_VERSION }}
 
     - name: Update Release Notes File
+      id: update-release-notes
       env:
         RELEASE_NOTES: ${{ steps.release-notes.outputs.body }}
       run: |
@@ -74,6 +81,21 @@ jobs:
         v="v$(go run $GITHUB_WORKSPACE/api/version/generate print-version)"
         f="docs/releasenotes/$v.md"
         echo "$RELEASE_NOTES" > "$f"
-        git add "$f"
-        git commit -m "ReleaseNotes for $RELEASE_VERSION"
-        git push origin ${GITHUB_REF#refs/heads/}
+        
+        echo "RELEASE_NOTES_FILE=$f" >> $GITHUB_OUTPUT
+        echo "RELEASE_NOTES_VERSION=$v" >> $GITHUB_OUTPUT
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v7
+      with:
+        token: ${{ steps.generate_token.outputs.token }}
+        title: "chore: release notes for ${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}"
+        commit-message: "[github-actions] release notes for ${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}"
+        branch: "chore/release-notes/${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}"
+        delete-branch: true
+        sign-commits: true
+        body: |
+          Update Release Notes for ${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}
+          
+          Prepares the Release Notes for the next release in ${{ steps.version-bump.outputs.RELEASE_NOTES_FILE }}
+          
