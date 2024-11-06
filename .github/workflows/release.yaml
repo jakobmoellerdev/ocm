@@ -25,7 +25,7 @@ jobs:
     outputs:
       base-version: ${{ steps.set-base-version.outputs.BASE_VERSION }}
       release-version: ${{ steps.set-version.outputs.RELEASE_VERSION }}
-      release-note-file: ${{ steps.verify-release-notes.outputs.RELEASE_NOTE_FILE }}
+      release-notes: ${{ steps.release-notes.outputs.body }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -46,6 +46,7 @@ jobs:
         echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
         echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
     - name: Set Version
+      id: set-version
       if: inputs.release_candidate == false
       run: |
         RELEASE_VERSION=${{env.BASE_VERSION}}
@@ -68,29 +69,12 @@ jobs:
         fi
         echo "Branch ${{ github.ref }} is a valid release branch"
 
-    # Check if the release notes file exists in the code base under the branch that is checked out
-    # If the file does not exist, the release will not be allowed to proceed
-    #
-    # In this case one should trigger the creation of the release notes file first
-    - name: Verify Release Notes
-      id: verify-release-notes
-      env:
-        GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-      run: |
-        if git ls-remote --exit-code origin refs/tags/${{ env.RELEASE_VERSION }}; then
-          >&2 echo "tag ${{ env.RELEASE_VERSION }} already exists"
-          exit 2
-        fi
-        v="${{env.RELEASE_VERSION}}"
-        f="docs/releasenotes/$v.md"
-        if [ ! -f "$f" ]; then
-          >&2 echo "no release notes file $f found in code base"
-          exit 2
-        else
-          echo "Using release notes file $f from code base"
-        fi
-        echo "RELEASE_NOTE_FILE=$f" >> $GITHUB_ENV
-        echo "RELEASE_NOTE_FILE=$f" >> $GITHUB_OUTPUT
+    - name: Get Draft Release Notes
+      id: release-notes
+      uses: cardinalby/git-get-release-action@v1
+      with:
+        draft: true
+        releaseName: ${{ env.RELEASE_VERSION }}
 
   components:
     name: Component CTF Builds
@@ -206,7 +190,7 @@ jobs:
       with:
         distribution: goreleaser
         version: 2.1.0
-        args: release --clean --timeout 60m --skip=validate --config=.github/config/goreleaser.yaml --release-notes=${{ needs.check.outputs.release-note-file }}
+        args: release --clean --timeout 60m --skip=validate --config=.github/config/goreleaser.yaml --release-notes=${{ needs.check.outputs.release-notes }}
       env:
         GITHUBORG: ${{ github.repository_owner }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
