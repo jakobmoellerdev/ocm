@@ -5,7 +5,6 @@ version: 2
 before:
   hooks:
     - go mod tidy
-    - make CTF_TYPE=directory ctf
 
 builds:
   - <<: &build_defaults

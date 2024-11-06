@@ -25,6 +25,7 @@ jobs:
     outputs:
       base-version: ${{ steps.set-base-version.outputs.BASE_VERSION }}
       release-version: ${{ steps.set-version.outputs.RELEASE_VERSION }}
+      release-version-no-prefix: ${{ steps.set-version.outputs.RELEASE_VERSION_NO_PREFIX }}
       release-notes: ${{ steps.release-notes.outputs.body }}
     steps:
       - name: Checkout
@@ -52,6 +53,10 @@ jobs:
           RELEASE_VERSION=${{env.BASE_VERSION}}
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Export Version Without Prefix
+        run: |
+          echo "RELEASE_VERSION_NO_PREFIX=${RELEASE_VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Check Tag
         run: |
@@ -82,15 +87,17 @@ jobs:
     name: Component CTF Builds
     uses: ./.github/workflows/components.yaml
     needs: check
+    with:
+      effective-version: ${{ needs.check.outputs.release-version-no-prefix }}
     permissions:
       contents: read
       pull-requests: read
-
 
   release:
     needs:
       # run check before actual release to make sure we succeed
       - check
+      - components
     name: Release Build
     runs-on: ubuntu-latest # TODO Do not merge - ROLLBACK TO large_runner
     env:
@@ -169,6 +176,16 @@ jobs:
           msg="Release ${{ env.RELEASE_VERSION }}"
           git tag --annotate --message "${msg}" ${{ env.RELEASE_VERSION }}
           git push origin ${{ env.RELEASE_VERSION }}
+
+      - name: Download CTF
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 'ctf-aggregated'
+          path: gen/downloaded-ctfs
+      - name: Move CTF into correct directory
+        run: |
+          mkdir -p ${{ github.workspace }}/gen
+          mv ${{ github.workspace }}/gen/downloaded-ctfs/ctf-aggregated ${{ github.workspace }}/gen/ctf
 
       # TODO From This point on we are technically not generating a release anymore,
       # but rather distributing the release to various package registries.
