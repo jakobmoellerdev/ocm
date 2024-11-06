@@ -27,61 +27,59 @@ jobs:
       release-version: ${{ steps.set-version.outputs.RELEASE_VERSION }}
       release-notes: ${{ steps.release-notes.outputs.body }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Generate Base Version
-      id: set-base-version
-      run: |
-        BASE_VERSION=v$(go run $GITHUB_WORKSPACE/api/version/generate print-version)
-        echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
-        echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
+      - name: Generate Base Version
+        id: set-base-version
+        run: |
+          BASE_VERSION=v$(go run $GITHUB_WORKSPACE/api/version/generate print-version)
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Set Version for Release Candidate
-      if: inputs.release_candidate == true
-      run: |
-        RELEASE_VERSION=v$(go run $GITHUB_WORKSPACE/api/version/generate --no-dev print-rc-version ${{ github.event.inputs.release_candidate_name }})
-        echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
-        echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-    - name: Set Version
-      id: set-version
-      if: inputs.release_candidate == false
-      run: |
-        RELEASE_VERSION=${{env.BASE_VERSION}}
-        echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
-        echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+      - name: Set Version for Release Candidate
+        if: inputs.release_candidate == true
+        run: |
+          RELEASE_VERSION=v$(go run $GITHUB_WORKSPACE/api/version/generate --no-dev print-rc-version ${{ github.event.inputs.release_candidate_name }})
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+      - name: Set Version
+        id: set-version
+        if: inputs.release_candidate == false
+        run: |
+          RELEASE_VERSION=${{env.BASE_VERSION}}
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Check Tag
-      run: |
-        set -e
-        if git ls-remote --exit-code origin refs/tags/${{ env.RELEASE_VERSION }} ; then
-          >&2 echo "tag ${{ env.RELEASE_VERSION }} already exists"
-          exit 1
-        fi
-
-    - name: Check if Running on Release Branch
-      run: |
-        if [[ ${{ github.ref }} != *"releases/"* ]]; then
-            echo "The branch ${{ github.ref }} is not a valid release branch and cannot be used for a release"
+      - name: Check Tag
+        run: |
+          set -e
+          if git ls-remote --exit-code origin refs/tags/${{ env.RELEASE_VERSION }} ; then
+            >&2 echo "tag ${{ env.RELEASE_VERSION }} already exists"
             exit 1
-        fi
-        echo "Branch ${{ github.ref }} is a valid release branch"
+          fi
 
-    - name: Get Draft Release Notes
-      id: release-notes
-      uses: cardinalby/git-get-release-action@v1
-      with:
-        draft: true
-        releaseName: ${{ env.RELEASE_VERSION }}
+      - name: Check if Running on Release Branch
+        run: |
+          if [[ ${{ github.ref }} != *"releases/"* ]]; then
+              echo "The branch ${{ github.ref }} is not a valid release branch and cannot be used for a release"
+              exit 1
+          fi
+          echo "Branch ${{ github.ref }} is a valid release branch"
+
+      - name: Get Draft Release Notes
+        id: release-notes
+        uses: cardinalby/git-get-release-action@v1
+        with:
+          draft: true
+          releaseName: ${{ env.RELEASE_VERSION }}
 
   components:
     name: Component CTF Builds
     uses: ./.github/workflows/components.yaml
     needs: check
-    with:
-
     permissions:
       contents: read
       pull-requests: read
@@ -89,9 +87,8 @@ jobs:
 
   release:
     needs:
-    # run check before actual release to make sure we succeed
-    # they will be skipped from the needs check
-    - check
+      # run check before actual release to make sure we succeed
+      - check
     name: Release Build
     runs-on: large_runner
     env:
@@ -102,130 +99,181 @@ jobs:
       id-token: write
       packages: write
     steps:
-    - name: Self Hosted Runner Post Job Cleanup Action
-      uses: TooMuch4U/actions-clean@v2.2
-    - name: Generate token
-      id: generate_token
-      uses: tibdex/github-app-token@v2
-      with:
-        app_id: ${{ secrets.OCMBOT_APP_ID }}
-        private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        # fetch all history so we can calculate the version and tagging
-        fetch-depth: 0
-        token: ${{ steps.generate_token.outputs.token }}
+      - name: Self Hosted Runner Post Job Cleanup Action
+        uses: TooMuch4U/actions-clean@v2.2
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.OCMBOT_APP_ID }}
+          private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # fetch all history so we can calculate the version and tagging
+          fetch-depth: 0
+          token: ${{ steps.generate_token.outputs.token }}
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: '${{ github.workspace }}/go.mod'
-        check-latest: false
-        cache: false
-    - name: Get go environment for use with cache
-      run: |
-        echo "go_cache=$(go env GOCACHE)" >> $GITHUB_ENV
-        echo "go_modcache=$(go env GOMODCACHE)" >> $GITHUB_ENV
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: '${{ github.workspace }}/go.mod'
+          check-latest: false
+          cache: false
+      - name: Get go environment for use with cache
+        run: |
+          echo "go_cache=$(go env GOCACHE)" >> $GITHUB_ENV
+          echo "go_modcache=$(go env GOMODCACHE)" >> $GITHUB_ENV
 
-    # This step will only reuse the go mod and build cache from main made during the Build,
-    # see push_ocm.yaml => "ocm-cli-latest" Job
-    # This means it never caches by itself and PRs cannot cause cache pollution / thrashing
-    # This is because we have huge storage requirements for our cache because of the mass of dependencies
-    - name: Restore / Reuse Cache from central build
-      id: cache-golang-restore
-      uses: actions/cache/restore@v4 # Only Restore, not build another cache (too big)
-      with:
-        path: |
-          ${{ env.go_cache }}
-          ${{ env.go_modcache }}
-        key: ${{ env.cache_name }}-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/go.mod') }}
-        restore-keys: |
-          ${{ env.cache_name }}-${{ runner.os }}-go-
-      env:
-        cache_name: ocm-cli-latest-go-cache # needs to be the same key in the end as in the build step
+      # This step will only reuse the go mod and build cache from main made during the Build,
+      # see push_ocm.yaml => "ocm-cli-latest" Job
+      # This means it never caches by itself and PRs cannot cause cache pollution / thrashing
+      # This is because we have huge storage requirements for our cache because of the mass of dependencies
+      - name: Restore / Reuse Cache from central build
+        id: cache-golang-restore
+        uses: actions/cache/restore@v4 # Only Restore, not build another cache (too big)
+        with:
+          path: |
+            ${{ env.go_cache }}
+            ${{ env.go_modcache }}
+          key: ${{ env.cache_name }}-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ hashFiles('**/go.mod') }}
+          restore-keys: |
+            ${{ env.cache_name }}-${{ runner.os }}-go-
+        env:
+          cache_name: ocm-cli-latest-go-cache # needs to be the same key in the end as in the build step
 
-    - name: Setup Syft
-      uses: anchore/sbom-action/download-syft@251a468eed47e5082b105c3ba6ee500c0e65a764 # v0.17.6
+      - name: Setup Syft
+        uses: anchore/sbom-action/download-syft@251a468eed47e5082b105c3ba6ee500c0e65a764 # v0.17.6
 
-    - name: Setup Cosign
-      uses: sigstore/cosign-installer@v3.7.0
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@v3.7.0
 
-    - name: Setup git config
-      run: |
-        git config user.name "GitHub Actions Bot"
-        git config user.email "<41898282+github-actions[bot]@users.noreply.github.com>"
+      - name: Setup git config
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<41898282+github-actions[bot]@users.noreply.github.com>"
 
-    - name: Create and Push Release into Tag
-      env:
-        GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-      run: |
-        # git checkout --detach HEAD
-        echo -n "${RELEASE_VERSION#v}" > VERSION
-        make -f hack/Makefile mdref && make -f hack/Makefile go-bindata && make generate
-        
-        git commit -m "Release $RELEASE_VERSION"
-        git add --all
-        
-        msg="Release ${{ env.RELEASE_VERSION }}"
-        git tag --annotate --message "${msg}" ${{ env.RELEASE_VERSION }}
-        git push origin ${{ env.RELEASE_VERSION }}
+      - name: Create and Push Release into Tag
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          # git checkout --detach HEAD
+          echo -n "${RELEASE_VERSION#v}" > VERSION
+          make -f hack/Makefile mdref && make -f hack/Makefile go-bindata && make generate
+          
+          git commit -m "Release $RELEASE_VERSION"
+          git add --all
+          
+          msg="Release ${{ env.RELEASE_VERSION }}"
+          git tag --annotate --message "${msg}" ${{ env.RELEASE_VERSION }}
+          git push origin ${{ env.RELEASE_VERSION }}
 
-    # TODO From This point on we are technically not generating a release anymore,
-    # but rather distributing the release to various package registries.
-    # However, because we are using goreleaser in a non optimal way,
-    # we are also rebuilding the binaries here instead of passing them from the
-    # already built CTF.
-    #
-    # Additionally the goreleaser is not a pure build since it also signs and pushes artifacts.
-    # Ideally, we would like to only pass the already built artifacts here from the CTF
-    # contained within the release tag in the future.
-    - name: Create GPG Token file from Secret
-      run: |
-        echo "${{ secrets.GPG_PRIVATE_KEY_FOR_SIGNING }}" > ocm-releases-key.gpg
-        echo "GPG_KEY_PATH=ocm-releases-key.gpg" >> $GITHUB_ENV
+      # TODO From This point on we are technically not generating a release anymore,
+      # but rather distributing the release to various package registries.
+      # However, because we are using goreleaser in a non optimal way,
+      # we are also rebuilding the binaries here instead of passing them from the
+      # already built CTF.
+      #
+      # Additionally the goreleaser is not a pure build since it also signs and pushes artifacts.
+      # Ideally, we would like to only pass the already built artifacts here from the CTF
+      # contained within the release tag in the future.
+      - name: Create GPG Token file from Secret
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY_FOR_SIGNING }}" > ocm-releases-key.gpg
+          echo "GPG_KEY_PATH=ocm-releases-key.gpg" >> $GITHUB_ENV
 
-    - name: Run GoReleaser
-      uses: goreleaser/goreleaser-action@v6
-      with:
-        distribution: goreleaser
-        version: 2.1.0
-        args: release --clean --timeout 60m --skip=validate --config=.github/config/goreleaser.yaml --release-notes=${{ needs.check.outputs.release-notes }}
-      env:
-        GITHUBORG: ${{ github.repository_owner }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-        GORELEASER_CURRENT_TAG: ${{ env.RELEASE_VERSION }}
-        NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: 2.1.0
+          args: release --clean --timeout 60m --skip=validate --config=.github/config/goreleaser.yaml --release-notes=${{ needs.check.outputs.release-notes }}
+        env:
+          GITHUBORG: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+          GORELEASER_CURRENT_TAG: ${{ env.RELEASE_VERSION }}
+          NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
-    - name: Remove GPG Token file
-      run: |
-        rm ocm-releases-key.gpg
+      - name: Remove GPG Token file
+        run: |
+          rm ocm-releases-key.gpg
 
-    # Distribute our Packages via our CTF into the OCM Repository
-    - name: Push OCM Components
-      env:
-        GITHUBORG: ${{ github.repository_owner }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: make plain-push
+      # Distribute our Packages via our CTF into the OCM Repository
+      - name: Push OCM Components
+        env:
+          GITHUBORG: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make plain-push
 
-    # Notify of the Release in the website Repository
-    - name: Publish Release Event
-      if: inputs.release_candidate == false
-      uses: peter-evans/repository-dispatch@v3
-      with:
-        token: ${{ steps.generate_token.outputs.token }}
-        repository: open-component-model/ocm-website
-        event-type: ocm-cli-release
-        client-payload: '{"tag": "${{ env.RELEASE_VERSION }}"}'
+      # Notify of the Release in the website Repository
+      - name: Publish Release Event
+        if: inputs.release_candidate == false
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          repository: open-component-model/ocm-website
+          event-type: ocm-cli-release
+          client-payload: '{"tag": "${{ env.RELEASE_VERSION }}"}'
 
-    # now distribute the release event so that other jobs can listen for this
-    # and use the event to publish our release to other package registries
-    - name: Publish Release Event for other package registries
-      if: inputs.release_candidate == false
-      uses: peter-evans/repository-dispatch@v3
-      with:
-        token: ${{ steps.generate_token.outputs.token }}
-        repository: ${{ github.repository_owner }}/ocm
-        event-type: publish-ocm-cli
-        client-payload: '{"version":"${{ env.RELEASE_VERSION }}","push-to-aur":true,"push-to-chocolatey":true,"push-to-winget":true}'
+      # now distribute the release event so that other jobs can listen for this
+      # and use the event to publish our release to other package registries
+      - name: Publish Release Event for other package registries
+        if: inputs.release_candidate == false
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          repository: ${{ github.repository_owner }}/ocm
+          event-type: publish-ocm-cli
+          client-payload: '{"version":"${{ env.RELEASE_VERSION }}","push-to-aur":true,"push-to-chocolatey":true,"push-to-winget":true}'
+
+  bump-patch-version-pr:
+    runs-on: ubuntu-latest
+    needs:
+      # After we completed a release that is not a candidate on a branch
+      # such as release/v0.y, the next step is to bump the Z version via PR on that branch
+      - release
+      # run check before actual release to make sure we succeed
+      - check
+    if: inputs.release_candidate == false
+    steps:
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.OCMBOT_APP_ID }}
+          private_key: ${{ secrets.OCMBOT_PRIV_KEY }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          token: ${{ steps.generate_token.outputs.token }}
+      - name: Version Bump
+        id: version-bump
+        run: |
+          set -e
+          
+          echo "determining next version"
+          version=$(go run ./api/version/generate bump-patch)
+          
+          echo "bumping main branch to $version"
+          echo $version > VERSION
+
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version after bump: $version"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+          title: "chore: bump VERSION to ${{ steps.version-bump.outputs.version }}"
+          commit-message: "[github-actions] Bump to ${{ steps.version-bump.outputs.version }} after branch cutoff"
+          branch: "chore/bump-main/v${{ steps.version-bump.outputs.version }}"
+          delete-branch: true
+          sign-commits: true
+          body: |
+            Update OCM Version to ${{ steps.version-bump.outputs.version }} 
+            
+            After the release of ${{ needs.release.outputs. }} through ${{ needs.cutoff-preconditions.outputs.branch }},
+            this bumps the OCM version so that future development continues on the next minor release.

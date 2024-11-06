@@ -86,7 +86,7 @@ jobs:
           git push origin $branch
   bump-main-pr:
     runs-on: ubuntu-latest
-    needs: create-branch # wait for the release branch to be created, then create a version bump
+    needs: [create-branch, cutoff-preconditions] # wait for the release branch to be created, then create a version bump
     steps:
       - name: Generate token
         id: generate_token
@@ -126,6 +126,6 @@ jobs:
           body: |
             Update OCM Version to ${{ steps.version-bump.outputs.version }} 
             
-            After the release branch cutoff to ${{ github.event.inputs.minor }} into ${{ steps.version-bump.outputs.branch }},
+            After the release branch cutoff into ${{ needs.cutoff-preconditions.outputs.branch }},
             this bumps the OCM version so that future development continues on the next minor release.
           
