@@ -85,7 +85,7 @@ jobs:
           git config --global user.name github-actions
           git config --global user.email '${GITHUB_ACTOR}@users.noreply.github.com'
           
-          minor="${{ needs.cutoff-preconditions.outputs.minor }}"
+          minor="v${{ needs.cutoff-preconditions.outputs.minor }}"
           
           if ! [[ "$tag" =~ ^v?[0-9]+\.[0-9]+$ ]]; then
             >&2 echo "no valid release branch minor $minor: it has to be of the form '^v?[0-9]+\.[0-9]+$'"
@@ -129,10 +129,6 @@ jobs:
           echo "determining next version"
           version=$(go run ./api/version/generate bump-version)
           
-          branch="chore/bump-main/$version"
-          
-          git checkout -b chore/bump-main-to-$branch
-          
           echo "bumping main branch to $version"
           echo $version > VERSION
 
@@ -140,7 +136,7 @@ jobs:
           make -f hack/Makefile mdref && make -f hack/Makefile go-bindata && make generate
           
           echo "version=$version" >> $GITHUB_OUTPUT
-          echo "branch=$branch" >> $GITHUB_OUTPUT
+          echo "version after bump: $version"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
@@ -148,7 +144,7 @@ jobs:
           token: ${{ steps.generate_token.outputs.token }}
           title: "chore: bump VERSION to ${{ steps.version-bump.outputs.version }}"
           commit-message: "[github-actions] Bump to ${{ steps.version-bump.outputs.version }} after branch cutoff"
-          branch: ${{ steps.version-bump.outputs.branch }}
+          branch: "chore/bump-main/v${{ steps.version-bump.outputs.version }}"
           delete-branch: true
           sign-commits: true
           body: |
