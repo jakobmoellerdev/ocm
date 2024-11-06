@@ -72,13 +72,13 @@ jobs:
       uses: peter-evans/create-pull-request@v7
       with:
         token: ${{ steps.generate_token.outputs.token }}
-        title: "chore: release notes for ${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}"
-        commit-message: "[github-actions] release notes for ${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}"
-        branch: "chore/release/notes/${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}"
+        title: "chore: release notes for ${{ steps.update-release-notes.outputs.RELEASE_NOTES_VERSION }}"
+        commit-message: "[github-actions] release notes for ${{ steps.update-release-notes.outputs.RELEASE_NOTES_VERSION }}"
+        branch: "chore/release/notes/${{ steps.update-release-notes.outputs.RELEASE_NOTES_VERSION }}"
         delete-branch: true
         sign-commits: true
         body: |
-          Update Release Notes for ${{ steps.version-bump.outputs.RELEASE_NOTES_VERSION }}
+          Update Release Notes for ${{ steps.update-release-notes.outputs.RELEASE_NOTES_VERSION }}
           
-          Prepares the Release Notes for the next release in ${{ steps.version-bump.outputs.RELEASE_NOTES_FILE }}
+          Prepares the Release Notes for the next release in ${{ steps.update-release-notes.outputs.RELEASE_NOTES_FILE }}
           
