@@ -90,7 +90,7 @@ jobs:
       # run check before actual release to make sure we succeed
       - check
     name: Release Build
-    runs-on: large_runner
+    runs-on: ubuntu-latest # TODO Do not merge - ROLLBACK TO large_runner
     env:
       BASE_VERSION: ${{ needs.check.outputs.base-version }}
       RELEASE_VERSION: ${{ needs.check.outputs.release-version }}
