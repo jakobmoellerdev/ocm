@@ -17,7 +17,7 @@ on:
 jobs:
   check:
     name: Check Release Preconditions
-    runs-on: large_runner
+    runs-on: ubuntu-latest # TODO Do not merge - ROLLBACK TO large_runner
     permissions:
       contents: write
       id-token: write
