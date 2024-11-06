@@ -3,6 +3,12 @@ name: Components
 on:
   pull_request:
   workflow_call:
+    inputs:
+      effective-version:
+        type: string
+        required: false
+        description: "The version to use for the build"
+        default: ""
   push:
     branches:
       - main
@@ -14,6 +20,8 @@ permissions:
 env:
   CTF_TYPE: directory
   components: '["ocmcli", "helminstaller", "helmdemo", "subchartsdemo", "ecrplugin"]'
+  PLATFORMS: 'linux/amd64'
+#  PLATFORMS: 'windows/amd64 darwin/arm64 darwin/amd64 linux/amd64 linux/arm64'
 
 jobs:
   define-matrix:
@@ -34,7 +42,7 @@ jobs:
     strategy:
       matrix:
         component: ${{fromJSON(needs.define-matrix.outputs.components)}}
-    runs-on: large_runner
+    runs-on: ubuntu-latest # TODO Do not merge - ROLLBACK TO large_runner
     steps:
       - name: Self Hosted Runner Post Job Cleanup Action
         uses: TooMuch4U/actions-clean@v2.2
@@ -68,7 +76,11 @@ jobs:
       - name: CTF
         run: |
           cd components/${{ matrix.component }}
-          PATH=$PATH:$(go env GOPATH)/bin CTF_TYPE=${{ env.CTF_TYPE }} make ctf descriptor describe
+          PATH=$PATH:$(go env GOPATH)/bin \
+          CTF_TYPE=${{ env.CTF_TYPE }} \
+          EFFECTIVE_VERSION=${{ inputs.effective-version }} \
+          PLATFORMS=${{ env.PLATFORMS }} \
+          make ctf descriptor describe
       - name: Upload CTF
         uses: actions/upload-artifact@v4
         with:
@@ -80,7 +92,7 @@ jobs:
 
   aggregate:
     name: "Aggregate"
-    runs-on: large_runner
+    runs-on: ubuntu-latest # TODO Do not merge - ROLLBACK TO large_runner
     needs: [build, define-matrix]
     env:
       components: ${{ join(fromJSON(needs.define-matrix.outputs.components), ' ') }}
