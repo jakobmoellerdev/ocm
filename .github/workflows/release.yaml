@@ -74,15 +74,6 @@ jobs:
           fi
           echo "Branch ${{ github.ref }} is a valid release branch"
 
-      - name: Get Draft Release Notes
-        id: release-notes
-        uses: cardinalby/git-get-release-action@v1
-        with:
-          draft: true
-          releaseName: ${{ env.RELEASE_VERSION }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   components:
     name: Component CTF Builds
     uses: ./.github/workflows/components.yaml
@@ -206,13 +197,21 @@ jobs:
         with:
           distribution: goreleaser
           version: 2.1.0
-          args: release --clean --timeout 60m --skip=validate --config=.github/config/goreleaser.yaml --release-notes=${{ needs.check.outputs.release-notes }}
+          args: release --clean --timeout 60m --skip=validate --config=.github/config/goreleaser.yaml --release-notes=""
         env:
           GITHUBORG: ${{ github.repository_owner }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
           GORELEASER_CURRENT_TAG: ${{ env.RELEASE_VERSION }}
           NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Drafter
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: ${{env.RELEASE_VERSION }}
+          version: ${{env.RELEASE_VERSION }}
 
       - name: Remove GPG Token file
         run: |
