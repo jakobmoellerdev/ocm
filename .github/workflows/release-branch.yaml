@@ -46,7 +46,7 @@ jobs:
       - name: Verify Release Notes already exist
         id: verify-release-notes
         env:
-          RELEASE_VERSION: ${{ steps.get-minor.outputs.minor }}.0
+          RELEASE_VERSION: v${{ steps.get-minor.outputs.minor }}.0
         run: |
           f="docs/releasenotes/$RELEASE_VERSION.md"
           if [ ! -f "$f" ]; then
