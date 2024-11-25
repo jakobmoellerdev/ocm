@@ -181,8 +181,22 @@ jobs:
         git commit -m "Release $RELEASE_VERSION"
         msg="Release ${{ env.RELEASE_VERSION }}"
         git tag --annotate --message "${msg}" ${{ env.RELEASE_VERSION }}
-        # push both the tag as well as a release branch with that tag.
+        # push the tag.
         git push origin ${{ env.RELEASE_VERSION }}
+    # in case we do not have a release candidate, we should merge the release into the branch
+    # this is so that the tag shows up in the branch and we can use it for the release notes.
+    # This allows us to generate the notes for the next versions based on the last release.
+    # Example:
+    # Branch releases/v0.19
+    # - Candidate Build v0.19.0-rc.1 => no merge, release notes based on original cutoff
+    # - Actual Build v0.19.0 => merge, release notes based on original cutoff
+    # - Candidate Build v0.19.1-rc.1 => no merge, release notes based on v0.19.0 due to previous merge
+    - name: Merge Release Tag back into release branch if not a release candidate
+      if: inputs.release_candidate == false
+      run: |
+        git checkout ${{ github.ref }}
+        git merge --strategy ours ${{ env.RELEASE_VERSION }}
+        git push origin ${{ github.ref }}
 
     - name: Create GPG Token file from Secret
       run: |
