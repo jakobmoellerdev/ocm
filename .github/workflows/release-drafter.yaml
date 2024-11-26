@@ -42,8 +42,11 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          sparse-checkout: |
+            hack/collapse
       - name: Setup Release with gh
         env:
+          COLLAPSE_THRESHOLD: 5
           GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           # generate the release notes based on the last previous tag.
@@ -69,6 +72,16 @@ jobs:
                -f "configuration_file_path=.github/release.yml" \
                -q .body \
              )
+          
+          if [[ -z $notes ]]; then
+            echo "No release notes generated from API, failed"
+            exit 1
+          fi
+          
+          echo "Auto-Collapsing release notes to reduce size"
+          echo $notes > $RUNNER_TEMP/release_notes.md
+          bash hack/collapse/auto_collapse.sh $RUNNER_TEMP/release_notes.md $RUNNER_TEMP/release_notes_processed.md ${{ env.COLLAPSE_THRESHOLD }}
+          notes=$(cat $RUNNER_TEMP/release_notes_processed.md)
           
           echo "Release Notes generated for ${{env.RELEASE_VERSION}}:"
           echo "${notes}"
